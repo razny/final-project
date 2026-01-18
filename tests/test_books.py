@@ -75,3 +75,26 @@ def test_create_book_invalid_type():
     }
     response = client.post("/books/", json=invalid_book)
     assert response.status_code == 422
+
+def test_update_book():
+    create_resp = client.post("/books/", json={
+        "title": "Stary Tytul",
+        "author": "Autor",
+        "year": 2000,
+        "description": "Opis"
+    })
+
+    book_id = create_resp.json()["id"]
+
+    update_data = {
+        "title": "Nowy Tytul",
+        "year": 2025
+    }
+    response = client.put(f"/books/{book_id}", json=update_data)
+    
+    assert response.status_code == 200
+    
+    data = response.json()
+    assert data["title"] == "Nowy Tytul"
+    assert data["year"] == 2025
+    assert data["author"] == "Autor"  
