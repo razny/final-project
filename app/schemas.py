@@ -17,3 +17,9 @@ class Book(BookBase):
 
     class Config:
         orm_mode = True
+
+class BookUpdate(BaseModel):
+    title: str | None = None
+    author: str | None = None
+    description: str | None = None
+    year: int | None = None
