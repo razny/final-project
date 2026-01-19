@@ -32,6 +32,7 @@
 
             localStorage.setItem('token', data.access_token);
             localStorage.setItem('user', username);
+            localStorage.setItem('role', data.role);
             document.getElementById('message').innerText = "Zalogowano pomyślnie! Przekierowanie...";
             setTimeout(() => window.location.href = "/", 1000);
         } else {

@@ -1,8 +1,18 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2>Lista Książek</h2>
+<h2>Biblioteka</h2>
 <div id="authStatus" style="margin-bottom: 20px;"></div>
+
+<div id="adminSection" style="display:none; border: 2px solid #d9534f; padding: 15px; margin-bottom: 20px;">
+    <h3>Admin Panel:</h3>
+    <h3>Dodaj nową książkę</h3>
+    <input type="text" id="newTitle" placeholder="Tytuł">
+    <input type="text" id="newAuthor" placeholder="Autor">
+    <input type="number" id="newYear" placeholder="Rok">
+    <textarea id="newDesc" placeholder="Opis"></textarea>
+    <button onclick="addBook()">Dodaj książkę</button>
+</div>
 
 <div id="booksContainer">
     <ul id="booksList"></ul>
@@ -10,27 +20,10 @@
 
 <div id="editSection" style="display:none; border: 1px solid #ccc; padding: 20px; margin-top: 20px; background-color: #f9f9f9;">
     <h3>Edytuj Książkę (ID: <span id="editId"></span>)</h3>
-    
-    <div style="margin-bottom: 10px;">
-        <label>Tytuł:</label><br>
-        <input type="text" id="editTitle" style="width: 100%;">
-    </div>
-    
-    <div style="margin-bottom: 10px;">
-        <label>Autor:</label><br>
-        <input type="text" id="editAuthor" style="width: 100%;">
-    </div>
-
-    <div style="margin-bottom: 10px;">
-        <label>Rok wydania:</label><br>
-        <input type="number" id="editYear">
-    </div>
-
-    <div style="margin-bottom: 10px;">
-        <label>Opis:</label><br>
-        <textarea id="editDescription" rows="4" style="width: 100%;"></textarea>
-    </div>
-
+    <label>Tytuł:</label> <input type="text" id="editTitle" style="width: 100%;"><br>
+    <label>Autor:</label> <input type="text" id="editAuthor" style="width: 100%;"><br>
+    <label>Rok:</label> <input type="number" id="editYear"><br>
+    <label>Opis:</label> <textarea id="editDescription" rows="4" style="width: 100%;"></textarea><br>
     <button onclick="submitEdit()">Zapisz zmiany</button>
     <button onclick="closeEdit()">Anuluj</button>
 </div>
@@ -38,93 +31,120 @@
 <script>
     const token = localStorage.getItem('token');
     const user = localStorage.getItem('user');
+    const role = localStorage.getItem('role');
     
     let allBooks = []; 
 
     if (token) {
-        document.getElementById('authStatus').innerHTML = `Zalogowany jako: <b>${user}</b> <button onclick="logout()">Wyloguj</button>`;
+        let roleBadge = role === 'admin' ? ' <b style="color:red">(ADMIN)</b>' : ' (Użytkownik)';
+        document.getElementById('authStatus').innerHTML = `Zalogowany jako: <b>${user}</b>${roleBadge} <button onclick="logout()">Wyloguj</button>`;
+        
+        if (role === 'admin') {
+            document.getElementById('adminSection').style.display = 'block';
+        }
     } else {
-        document.getElementById('authStatus').innerHTML = `Tylko zalogowani użytkownicy mogą edytować. <a href="/login">Zaloguj się</a>`;
+        document.getElementById('authStatus').innerHTML = `Zaloguj się aby edytować. <a href="/login">Logowanie</a>`;
     }
 
     async function loadBooks() {
-        try {
-            const response = await fetch('/books/');
-            allBooks = await response.json();
+        const response = await fetch('/books/');
+        allBooks = await response.json();
+        const list = document.getElementById('booksList');
+        list.innerHTML = '';
+        
+        allBooks.forEach(book => {
+            const li = document.createElement('li');
+            li.style.marginBottom = "15px";
             
-            const list = document.getElementById('booksList');
-            list.innerHTML = '';
-            
-            allBooks.forEach(book => {
-                const li = document.createElement('li');
-                li.style.marginBottom = "15px";
-                
-                const editBtn = token ? ` <button onclick="openEdit(${book.id})">Edytuj</button>` : '';
-                
-                li.innerHTML = `
-                    <strong>${book.title}</strong> (${book.year || 'brak roku'}) <br>
-                    <small>Autor: ${book.author}</small><br>
-                    <em>${book.description || 'Brak opisu.'}</em>
-                    <div style="margin-top: 5px;">${editBtn}</div>
-                `;
-                list.appendChild(li);
-            });
-        } catch (error) {
-            console.error('Błąd pobierania książek:', error);
+            let buttons = '';
+            if (token) {
+                buttons += `<button onclick="openEdit(${book.id})">Edytuj</button> `;
+            }
+            if (role === 'admin') {
+                buttons += `<button onclick="deleteBook(${book.id})" style="color:red">Usuń</button>`;
+            }
+
+            li.innerHTML = `
+                <strong>${book.title}</strong> (${book.year || '-'}) <br>
+                <small>${book.author}</small><br>
+                <em>${book.description || ''}</em>
+                <div style="margin-top: 5px;">${buttons}</div>
+            `;
+            list.appendChild(li);
+        });
+    }
+
+    async function addBook() {
+        const newBook = {
+            title: document.getElementById('newTitle').value,
+            author: document.getElementById('newAuthor').value,
+            year: document.getElementById('newYear').value,
+            description: document.getElementById('newDesc').value
+        };
+
+        const response = await fetch('/books/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+            body: JSON.stringify(newBook)
+        });
+
+        if (response.ok) {
+            alert("Dodano!");
+            loadBooks();
+            document.getElementById('newTitle').value = ""; 
+        } else {
+            alert("Błąd! Tylko Admin może dodawać.");
+        }
+    }
+
+    async function deleteBook(id) {
+        if(!confirm("Czy na pewno usunąć?")) return;
+
+        const response = await fetch(`/books/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+
+        if (response.ok) {
+            loadBooks();
+        } else {
+            alert("Błąd! Tylko Admin może usuwać.");
         }
     }
 
     function openEdit(id) {
         const book = allBooks.find(b => b.id === id);
         if (!book) return;
-
         document.getElementById('editSection').style.display = 'block';
         document.getElementById('editId').innerText = book.id;
-        
         document.getElementById('editTitle').value = book.title;
         document.getElementById('editAuthor').value = book.author;
-        document.getElementById('editYear').value = book.year || '';
-        document.getElementById('editDescription').value = book.description || '';
-        
+        document.getElementById('editYear').value = book.year;
+        document.getElementById('editDescription').value = book.description;
         document.getElementById('editSection').scrollIntoView({behavior: "smooth"});
     }
 
-    function closeEdit() {
-        document.getElementById('editSection').style.display = 'none';
-    }
+    function closeEdit() { document.getElementById('editSection').style.display = 'none'; }
 
     async function submitEdit() {
         const id = document.getElementById('editId').innerText;
-        
         const updatedBook = {
             title: document.getElementById('editTitle').value,
             author: document.getElementById('editAuthor').value,
-            year: document.getElementById('editYear').value ? parseInt(document.getElementById('editYear').value) : null,
+            year: document.getElementById('editYear').value,
             description: document.getElementById('editDescription').value
         };
-
         const response = await fetch(`/books/${id}`, {
             method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + token
-            },
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
             body: JSON.stringify(updatedBook)
         });
-
-        if (response.ok) {
-            alert("Zaktualizowano pomyślnie!");
-            closeEdit();
-            loadBooks();
-        } else {
-            const err = await response.json();
-            alert("Błąd: " + (err.detail || "Nie udało się zapisać"));
-        }
+        if (response.ok) { closeEdit(); loadBooks(); } 
+        else { alert("Błąd edycji"); }
     }
 
     function logout() {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        localStorage.clear();
         window.location.reload();
     }
 
