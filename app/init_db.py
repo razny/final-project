@@ -50,7 +50,7 @@ def init_db():
 
         db.add(db_admin)
         db.commit()
-        print("Superuser created. Login: admin / Pass: admin123")
+        print("Superuser created. Login: admin / Pass: admin")
     else:
         print("Admin user already exists.")
 

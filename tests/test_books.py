@@ -1,50 +1,15 @@
-import os
 import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from app.database import Base
-from app.main import app
-from app.database import get_db
+from tests.test_config import client, init_test_db, cleanup_test_db, TestingSessionLocal
 
-# use a temporary SQLite file DB
-TEST_DATABASE_URL = "sqlite:///./test_temp.db"  # file-based SQLite
-engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# override get_db dependency
-def override_get_db():
-    db = TestingSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-app.dependency_overrides[get_db] = override_get_db
-
-# fixture to create tables before tests and drop after
-@pytest.fixture(scope="session", autouse=True)
-def setup_test_db():
-    Base.metadata.create_all(bind=engine)  # create tables
+@pytest.fixture(scope="module", autouse=True)
+def setup_db():
+    init_test_db()
     yield
-    Base.metadata.drop_all(bind=engine)    # drop tables
-    engine.dispose()                        # close all connections
-    if os.path.exists("./test_temp.db"):
-        os.remove("./test_temp.db")
-
-client = TestClient(app)
+    cleanup_test_db()
 
 def get_admin_headers():
 
     login_data = {"username": "test_admin", "password": "password", "role": "admin"}
-    
-    # 1. Rejestracja (backend wymusza role='user', ale my tutaj zasymulujemy 
-    #    admina przez init_db albo stworzenie superusera w inny sposób. 
-    #    ALE: Ponieważ w testach używamy pustej bazy SQLite, init_db się nie odpalił automatem.
-    #    Musimy stworzyć admina "ręcznie" w bazie lub użyć endpointu jeśli pozwala.
-    #    W Twoim kodzie rejestracja wymusza role="user". 
-    #    Więc dla testów musimy "oszukać" system i wstrzyknąć admina do bazy."""
-    
     client.post("/auth/register", json={"username": "test_admin", "password": "password"})
     
     db = TestingSessionLocal()
